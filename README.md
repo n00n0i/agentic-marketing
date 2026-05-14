@@ -1,103 +1,133 @@
-# Agentic Marketing Pipeline
+# Agentic Marketing Platform
 
-Full-funnel content generation, publishing & analytics powered by LLM-driven multi-agent orchestration.
+**Full-funnel, multi-channel marketing pipeline powered by LLM agents.**
 
-## Overview
+```ascii
+Research → Copy → Creative → Repurpose → Publish → Analytics
+   ↓         ↓        ↓          ↓          ↓          ↓
+Audience  3 var   FLUX img   10+ pieces  Multi-platform   ROI
+insights  /plat  (Modal)    from 1       scheduling       tracking
+```
 
-The Agentic Marketing Pipeline is a YAML-driven, LangChain/LangGraph-based system that automates the complete marketing content lifecycle — from strategic research through content creation, repurposing, and performance analytics.
+## Features
 
-No hardcoded pipeline logic. Each stage is defined in YAML and rendered by an LLM reading Markdown skill definitions.
+- **10-stage pipeline** — Research → Strategy → Brief → Copy → Creative → Repurpose → Ad → Email → Publish → Analytics
+- **CHAI quality gates** — 5-dimension review (Complete, Helpful, Accurate, Insightful, Actionable) with 2-round retry
+- **Multi-platform publishing** — Twitter/X, LinkedIn, Facebook, Instagram, Buffer
+- **FLUX image generation** — via Modal serverless GPU
+- **LangGraph orchestration** — stateful, resumable pipeline with EP (Executive Producer) pattern
+- **Multi-tenant** — User → Workspace → Campaign hierarchy
+- **Analytics dashboard** — cross-platform metrics, campaign performance, ROI tracking
+
+## Quick Start
+
+```bash
+# 1. Clone
+git clone https://github.com/n00n0i/agentic-marketing.git
+cd agentic-marketing
+
+# 2. Python environment
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[server]"
+
+# 3. Environment variables
+cp .env.example .env
+# Edit .env and add your API keys
+
+# 4. Frontend
+cd frontend && npm install && npm run dev
+# → http://localhost:3000
+
+# 5. Run a demo pipeline
+python -m src.agentic_marketing.api "AI Automation for SaaS Teams" twitter
+```
 
 ## Architecture
 
 ```
 agentic-marketing/
-├── pipeline_defs/          # YAML pipeline manifests (the "source of truth")
-├── skills/                 # Markdown skill definitions per stage
-│   ├── pipelines/marketing/  # Per-director skill files
-│   └── meta/                # Cross-cutting meta skills (reviewer, etc.)
-├── schemas/                # JSON Schema for all artifacts
-│   ├── pipelines/            # Pipeline manifest schemas
-│   └── artifacts/            # Artifact schemas
-└── src/                   # Python source (langchain/langgraph implementations)
+├── src/agentic_marketing/
+│   ├── agents/          # LangGraph agent nodes
+│   │   ├── marketing_agent.py   # Main orchestrator (EP pattern)
+│   │   ├── copy_agent.py       # Copy generation
+│   │   ├── creative_agent.py   # FLUX image gen
+│   │   └── repurposing_agent.py
+│   ├── chains/          # LangChain chains
+│   │   ├── copy_chain.py       # LLM copy generation
+│   │   ├── research_chain.py   # Market research
+│   │   ├── publish_chain.py   # Publishing workflow
+│   │   └── review_chain.py     # CHAI review
+│   ├── social/          # Platform clients
+│   │   ├── twitter_client.py    # Twitter API v2
+│   │   ├── linkedin_client.py   # LinkedIn API v2
+│   │   ├── facebook_client.py  # Meta Graph API
+│   │   ├── buffer_client.py     # Buffer API v1
+│   │   ├── publish_manager.py  # Unified publish interface
+│   │   └── analytics.py        # Cross-platform analytics
+│   ├── review/          # CHAI quality gates
+│   │   ├── chai_reviewer.py    # 5-dimension scorer
+│   │   ├── quality_gates.py    # Gate definitions
+│   │   └── moderation.py      # Content moderation
+│   ├── workflows/       # LangGraph workflow nodes
+│   │   ├── marketing_agent.py  # Main graph
+│   │   ├── publish_workflow.py
+│   │   └── review_workflow.py
+│   ├── state.py         # EP_STATE management
+│   ├── budget.py        # Cost estimation
+│   ├── pipeline_loader.py
+│   ├── vectorstore.py   # Qdrant integration
+│   └── api/             # FastAPI routes
+│       └── analytics_api.py
+├── frontend/
+│   └── app/
+│       ├── page.tsx           # Main dashboard
+│       └── analytics/page.tsx # Analytics dashboard
+├── skills/              # Director skills
+│   └── pipelines/marketing/  # 12 stage director skills
+└── pipeline_defs/       # YAML pipeline manifests
 ```
 
-### Core Principles
+## Pipeline Stages
 
-1. **YAML-first**: Pipeline definitions in `pipeline_defs/` control stage sequencing, checkpoints, and approval gates
-2. **LLM-driven**: Each director (Research, Copy, Creative, etc.) is a LangChain agent that reads its Markdown skill file at runtime
-3. **Schema-validated**: All artifacts are JSON-schema validated at each stage boundary
-4. **CHAI Review**: Every artifact passes through a Consistent, Helpful, Accurate, Insightful (CHAI) review loop
-5. **Decision-logged**: All significant choices are recorded with alternatives considered, scores, and reasoning
+| # | Stage | Description |
+|---|-------|-------------|
+| 1 | Research | Market research, audience analysis, competitor tracking |
+| 2 | Strategy | Strategic angles, positioning, competitive differentiation |
+| 3 | Brief | Content brief with goals, audience, key messages |
+| 4 | Copy | 3-5 copy variants per platform (problem/stat/outcome-led) |
+| 5 | Creative | FLUX image generation via Modal (or placeholder) |
+| 6 | Repurpose | Transform 1 piece → 10+ pieces across platforms |
+| 7 | Ad Creative | Ad variations for paid campaigns |
+| 8 | Email | Email sequence generation |
+| 9 | Publish | Multi-platform scheduling and posting |
+| 10 | Analytics | Cross-platform metrics and ROI tracking |
 
-## Phases
+## Environment Variables
 
-| Phase | Description |
-|-------|-------------|
-| **Phase 1** | Core Content Loop — research → brief → copy → creative → repurpose → publish |
-| **Phase 2** | Paid Ads Integration — audience targeting, ad creative, budget optimization |
-| **Phase 3** | Analytics & Optimization — performance tracking, A/B testing, ROI analysis |
-| **Phase 4** | Multi-tenant & White-label — SaaS-ready, per-client isolation |
-| **Phase 5** | Autonomous AI Agents — self-improving agents with memory and learned patterns |
+See [`.env.example`](.env.example) for all configuration options.
 
-## Stages (Phase 1)
-
-| # | Director | Artifact | Description |
-|---|----------|----------|-------------|
-| 1 | Marketing Director | `market_brief` | Top-level orchestrator, gates all downstream work |
-| 2 | Research Director | `market_brief` (enriched) | Audience, competitor, strategic angle analysis |
-| 3 | Strategy Director | `channel_strategy` | Channel selection, budget allocation, sequencing |
-| 4 | Brief Director | `content_brief` | Per-channel content specifications |
-| 5 | Copy Director | `copy_variants` | 3–5 variants per platform, A/B scored |
-| 6 | Creative Director | `creative_assets` | Visual assets, format adaptation, brand compliance |
-| 7 | Repurpose Director | `repurpose_plan` | 1 → 10+ pieces from a single asset |
-| 8 | Publish Director | `publish_log` | Scheduling, publishing, cross-channel coordination |
-
-## Setup
-
-```bash
-# Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -e .
-
-# Verify installation
-python -c "from agentic_marketing import __version__; print(__version__)"
-```
-
-## Usage
-
-```python
-from agentic_marketing import AgenticMarketingPipeline
-
-pipeline = AgenticMarketingPipeline.from_manifest("pipeline_defs/agentic-marketing.yaml")
-result = pipeline.run(topic="Launching our new B2B SaaS analytics product")
-```
+Key variables:
+- `OPENAI_API_KEY` — for copy generation and CHAI review
+- `TWITTER_*` — Twitter API credentials
+- `LINKEDIN_ACCESS_TOKEN` — LinkedIn API
+- `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` — for FLUX image generation
+- `DATABASE_URL` — PostgreSQL connection string
 
 ## Development
 
 ```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
 # Run tests
 pytest
 
-# Validate all schemas
-python -m jsonschema --dry-run schemas/**/*.json
-
 # Lint
 ruff check src/
+
+# Type check
+mypy src/
 ```
-
-## Tech Stack
-
-- **Orchestration**: LangChain / LangGraph
-- **Structured Output**: Pydantic v2
-- **Schema Validation**: jsonschema
-- **Primary DB**: PostgreSQL (relational artifacts, decision logs)
-- **Document Store**: MongoDB (content variants, creative assets)
-- **Vector Search**: Qdrant (semantic lookup, RAG)
-- **Frontend**: Next.js (dashboard, pipeline monitoring)
 
 ## License
 
