@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { MetricCard } from "@/components/analytics/MetricCard";
-import { PlatformBarChart } from "@/components/analytics/PlatformBarChart";
-import { PostsTable } from "@/components/analytics/PostsTable";
+import MetricCard from "@/components/analytics/MetricCard";
+import PlatformBarChart from "@/components/analytics/PlatformBarChart";
+import PostsTable from "@/components/analytics/PostsTable";
 import { fetchAnalyticsSummary, fetchPlatformBreakdown, fetchCampaignPerformance } from "@/lib/analytics";
 
 type DateRange = "7d" | "30d" | "90d";
@@ -144,7 +144,7 @@ export default function AnalyticsPage() {
           <MetricCard
             label="Top Platform"
             value={summary.top_platform}
-            trend={null}
+            trend={undefined}
             icon="🏆"
           />
         </div>
@@ -153,7 +153,7 @@ export default function AnalyticsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h2 className="text-lg font-semibold text-white mb-4">Platform Breakdown</h2>
-            <PlatformBarChart platforms={filteredPlatforms} />
+            <PlatformBarChart data={filteredPlatforms} />
           </div>
 
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">

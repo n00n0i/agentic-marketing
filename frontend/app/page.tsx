@@ -13,6 +13,13 @@ interface CopyVariant {
   char_count: number;
 }
 
+interface CopyVariantsResult {
+  variants: CopyVariant[];
+  total_variants: number;
+  platform: string;
+  generation_method: string;
+}
+
 interface PipelineResult {
   execution_id: string;
   status: string;
@@ -20,15 +27,12 @@ interface PipelineResult {
   platform: string;
   timestamp: string;
   artifacts: {
-    copy_variants: {
-      variants: CopyVariant[];
-      total_variants: number;
-    };
+    copy_variants: CopyVariantsResult;
     creative_assets: {
       assets: { asset_id: string; status: string; platform: string }[];
     };
     repurposed_content: {
-      pieces: { platform: string; type: string; content: string }[];
+      pieces: { platform: string; type: string; content: string | string[] }[];
     };
   };
   stage_status: Record<string, string>;
