@@ -1,0 +1,231 @@
+# Pipeline Manifest: Agentic Marketing
+# Validated against: schemas/pipelines/agentic-marketing.schema.json
+
+name: agentic-marketing
+version: "1.0"
+category: marketing
+stability: production
+description: >
+  Full-funnel marketing pipeline: research → strategy → content creation →
+  repurposing → publishing across organic, paid, and email channels.
+
+default_checkpoint_policy: guided
+
+orchestration:
+  mode: marketing-director
+  skill: pipelines/marketing/marketing-director
+  budget_default_usd: 5.00
+  max_revisions_per_stage: 3
+  max_send_backs: 2
+  max_wall_time_minutes: 30
+
+extensions:
+  custom_scripts: true
+  custom_playbooks: true
+  custom_skills: true
+  custom_tools: false
+
+required_skills:
+  - pipelines/marketing/marketing-director
+  - pipelines/marketing/research-director
+  - pipelines/marketing/strategy-director
+  - pipelines/marketing/brief-director
+  - pipelines/marketing/copy-director
+  - pipelines/marketing/creative-director
+  - pipelines/marketing/repurpose-director
+  - pipelines/marketing/publish-director
+  - pipelines/marketing/targeting-director
+  - pipelines/marketing/ad-creative-director
+  - pipelines/marketing/email-director
+  - meta/reviewer
+  - meta/checkpoint-protocol
+  - meta/decision-logger
+
+channels:
+  organic:
+    platforms: [twitter, linkedin, facebook, instagram]
+    media_spend: 0
+    tools: [social_media_analyzer, content_scheduler]
+  paid:
+    platforms: [meta_ads, google_ads, linkedin_ads]
+    media_spend: variable
+    tools: [keyword_research, competitor_ads, audience_builder]
+  email:
+    platforms: [mailchimp, klaviyo, sendgrid]
+    cost_per_email: 0.001
+    tools: [email_audience_analyzer, personalization_engine]
+
+stages:
+
+  - name: research
+    skill: pipelines/marketing/research-director
+    produces: [market_brief, decision_log]
+    checkpoint_required: false
+    human_approval_default: false
+    tools_available: [web_search, competitor_analysis, keyword_research]
+    review_focus:
+      - Audience segments clearly defined with data backing
+      - Competitor analysis includes real examples and content URLs
+      - At least 3 distinct strategic angles identified
+      - All claims grounded in specific data points
+    success_criteria:
+      - market_brief with ≥3 audience segments (demographics, psychographics, behavioral)
+      - ≥5 competitors analyzed with content examples
+      - ≥3 strategic angles with ≥2 supporting data points each
+      - Keywords with volume + difficulty data
+      - Best timing recommendations per channel
+
+  - name: strategy
+    skill: pipelines/marketing/strategy-director
+    produces: [channel_strategy, decision_log]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Channel selection justified by audience overlap
+      - Budget allocation explained with rationale
+      - Content mix suitable for each platform
+      - Timing/cadence plan is realistic
+    success_criteria:
+      - channel_strategy covering all target channels
+      - Budget breakdown per channel (percentage + absolute)
+      - Cadence/timing plan per channel
+      - Platform-specific format guidance
+
+  - name: brief
+    skill: pipelines/marketing/brief-director
+    produces: [content_brief]
+    checkpoint_required: false
+    human_approval_default: false
+    sub_stages:
+      - name: organic_brief
+        condition: "channel_organic_enabled"
+        tools_available: [web_search, social_media_analyzer]
+      - name: paid_brief
+        condition: "channel_paid_enabled"
+        tools_available: [keyword_research, competitor_ads]
+      - name: email_brief
+        condition: "channel_email_enabled"
+        tools_available: [email_audience_analyzer]
+
+  - name: copy
+    skill: pipelines/marketing/copy-director
+    produces: [copy_variants, decision_log]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Each variant has distinct angle or framing
+      - CTA is specific and action-oriented (no "click here" or "learn more")
+      - Word count appropriate for platform
+      - Brand voice consistent across variants
+      - All claims backed by market_brief data
+    success_criteria:
+      - ≥3 variants per content piece
+      - Each variant scored on engagement potential (1-10)
+      - All variants pass brand voice check
+      - Platform format compliance verified
+
+  - name: creative
+    skill: pipelines/marketing/creative-director
+    produces: [creative_assets]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Visual assets match copy variants
+      - Format specs correct for each platform
+      - Brand consistency (colors, fonts, logo usage)
+      - CTA clearly visible in all formats
+    success_criteria:
+      - Creative assets generated for all active channels
+      - All formats validated per platform requirements
+      - Aspect ratios correct (16:9, 1:1, 9:16)
+
+  - name: targeting
+    skill: pipelines/marketing/targeting-director
+    produces: [targeting_profile]
+    checkpoint_required: true
+    human_approval_default: true
+    stage_enabled: "channel_paid_enabled"
+    review_focus:
+      - Demographics data-backed (no vague descriptions)
+      - Interests aligned with strategic angles
+      - Budget reasonable for estimated audience size
+      - Lookalike audience sourcing defined
+      - Bid strategy appropriate for objective
+    success_criteria:
+      - targeting_profile with ≥3 audience segments
+      - Estimated reach within configured budget
+      - Lookalike audience defined with source
+      - Bid strategy selected per campaign
+
+  - name: ad_creative
+    skill: pipelines/marketing/ad-creative-director
+    produces: [ad_creative, decision_log]
+    checkpoint_required: true
+    human_approval_default: true
+    stage_enabled: "channel_paid_enabled"
+    review_focus:
+      - Creative matches targeting profile
+      - Format specs correct for ad network
+      - Compliance check passed
+      - CTA is specific and action-oriented
+    success_criteria:
+      - ≥3 headline variations
+      - ≥2 body variations
+      - All required formats covered (static, video, carousel)
+
+  - name: email_sequence
+    skill: pipelines/marketing/email-director
+    produces: [email_sequence, email_personalization]
+    checkpoint_required: true
+    human_approval_default: true
+    stage_enabled: "channel_email_enabled"
+    review_focus:
+      - Sequence tells a coherent story across emails
+      - Personalization tokens correctly placed
+      - Subject lines compelling (not clickbait)
+      - Timing logical for buyer journey
+      - GDPR/CAN-SPAM compliance
+    success_criteria:
+      - 5-7 email templates in sequence
+      - Personalization for ≥3 segments
+      - All trigger conditions defined
+
+  - name: repurpose
+    skill: pipelines/marketing/repurpose-director
+    produces: [repurpose_plan]
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Each piece adapted for platform (not copy-paste)
+      - Format correct per platform specs
+      - Visual assets repurposed correctly
+      - Scheduling optimized for platform peak times
+    success_criteria:
+      - ≥10 output pieces from 1 input
+      - Each piece platform-optimized
+      - Visual assets adapted for each format
+
+  - name: publish
+    skill: pipelines/marketing/publish-director
+    produces: [publish_log]
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - Schedule optimized for platform peak times
+      - All platforms have valid credentials
+      - Budget tracking current
+      - Compliance approved for all channels
+    success_criteria:
+      - All active channels scheduled
+      - Timing verified against analytics
+      - Budget reconcile matches plan
+
+budget_policies:
+  enforcement: warn  # warn | cap | observe
+  reserve_holdback_pct: 0.10
+  single_action_approval_threshold_usd: 0.50
+  new_paid_tool_approval_required: true
+  allocation:
+    organic: 0.15      # content production, no media spend
+    paid: 0.80         # media spend
+    email: 0.05        # platform cost
