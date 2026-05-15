@@ -27,41 +27,76 @@ logger = structlog.get_logger(__name__)
 
 # ── Stage prompts ─────────────────────────────────────────────────────────────
 
-SYSTEM_RESEARCH = """You are an expert marketing researcher. Analyze the given topic and produce a structured market brief.
+SYSTEM_RESEARCH = """You are an expert B2B marketing researcher specializing in demand generation and content marketing.
+Analyze the given topic using marketing frameworks: Buyer Journey (awareness → consideration → decision), Jobs-to-be-Done, and 80/20 Pareto principle.
 Return ONLY valid JSON with this exact shape:
 {
-  "audience_segments": [{"name": "...", "pain_points": [...], "desires": [...]}],
-  "key_themes": ["..."],
-  "competitor_angles": ["..."],
-  "top_3_insights": ["..."],
-  "pain_point_count": N
+  "audience_segments": [{"name": "...", "job_to_be_done": "...", "pain_points": ["...", "..."], "desired_outcomes": ["...", "..."], "buying_triggers": ["...", "..."]}],
+  "buyer_persona": {"age_range": "...", "role": "...", "goals": [...], "frustrations": [...], "decision_criteria": [...]},
+  "market_context": {"market_size_estimate": "...", "growth_rate": "...", "key_trend": "..."},
+  "key_themes": ["...", "..."],
+  "competitor_angles": [{"brand": "...", "positioning": "...", "weakness": "..."}],
+  "top_3_insights": ["...", "..."],
+  "pain_point_count": N,
+  "content_angles": [{"angle": "...", "emotional_lever": "...", "rational_lever": "..."}],
+  "relevant_statistics": ["N% of buyers...", "..."]
 }"""
 
-SYSTEM_COPY = """You are an expert copywriter. Generate 3 distinct copy variants for the given topic and platform.
+SYSTEM_COPY = """You are an expert direct-response copywriter with 10+ years in B2B demand generation.
+Use the AIDA framework (Attention → Interest → Desire → Action) and PAS (Problem → Agitate → Solution) copywriting formula.
+For each platform, adapt tone: LinkedIn = authoritative + data-driven; Twitter/X = punchy + controversial; Instagram = visual-first + aspirational; Facebook = community + story-driven.
 Return ONLY valid JSON:
 {
   "variants": [
-    {"approach": "problem_led|stat_led|outcome_led|question_led", "hook": "...", "body": "...", "cta": "..."},
+    {"approach": "problem_led|stat_led|outcome_led|question_led|story_led", "headline": "...", "hook": "...", "body": "...", "proof_points": ["...", "..."], "cta": "...", "emotional_trigger": "...", "social_proof": "..."},
     ...
   ]
 }
-Each variant must be platform-appropriate length (Twitter: <280 chars, LinkedIn: <3000 chars)."""
+Each variant must be platform-appropriate:
+- Twitter/X: headline 30 chars, hook 80 chars, body 200-280 chars, proof 1 stat, CTA 20 chars
+- LinkedIn: headline 60 chars, hook 150 chars, body 300-600 chars, proof 2-3 stats, CTA 40 chars
+- Instagram: headline 40 chars, hook 100 chars, body 150-220 chars + 5 hashtags, CTA 25 chars
+- Facebook: headline 50 chars, hook 120 chars, body 200-400 chars, CTA 30 chars"""
 
-SYSTEM_CREATIVE = """You are an expert creative director. Generate image prompts for the given copy variant.
+SYSTEM_CREATIVE = """You are an expert creative director for performance marketing. Generate image prompts for paid social and organic content.
 Return ONLY valid JSON:
 {
-  "style": "photorealistic|illustrative|typography|both",
-  "main_prompt": "detailed image generation prompt...",
-  "alt_prompts": ["...", "..."]
-}"""
+  "style": "photorealistic|illustrative|typography|motion|3d_render",
+  "main_prompt": "detailed Stable Diffusion / FLUX image generation prompt...",
+  "alt_prompts": ["alternative prompt 1...", "alternative prompt 2..."],
+  "color_palette": ["primary_hex", "secondary_hex", "accent_hex"],
+  "composition_notes": "e.g. 'rule of thirds, subject left, negative space right for text overlay'",
+  "text_placement": "top|bottom|center|none",
+  "aspect_ratio_options": ["1:1", "4:5", "16:9", "9:16"]
+}
+Image prompts should be specific: include lighting (golden hour, studio softbox), texture (matte paper, brushed metal), mood (urgent, aspirational, curious), brand-consistent visual language."""
 
-SYSTEM_REPURPOSE = """You are an expert content strategist. Repurpose the given copy for multiple platforms.
+SYSTEM_REPURPOSE = """You are an expert content strategist specializing in cross-platform content adaptation.
+Adapt one piece of content (blog, long-form, or webinar) into platform-specific native content.
+For each platform, optimize for: native algorithm signals (LinkedIn: discussion-provoking, Twitter: reply-chain worthy, Instagram: save-worthy), platform-specific vocabulary and hashtags, optimal post length for engagement.
 Return ONLY valid JSON:
 {
   "pieces": [
-    {"platform": "linkedin", "type": "post", "content": "..."},
-    {"platform": "twitter", "type": "thread", "content": ["line1", "line2", ...]},
-    {"platform": "instagram", "type": "caption", "content": "..."}
+    {"platform": "linkedin", "type": "post", "content": "Full LinkedIn post: 300-800 chars. Hook in line 1 (ends with emoji). Body expands with insight/stat. End with question or contrarian view to drive comments. Include 2-3 line breaks for readability.", "hashtags": ["#Topic", "#Industry", "#Trend"], "optimize_for": "comments|saves|reach"},
+    {"platform": "linkedin", "type": "article", "content": "Full article outline: title, 5-7 section headers with 2-sentence descriptions, key takeaways. 800-1200 words total.", "hashtags": ["#DeepDive"], "optimize_for": "shares"},
+    {"platform": "twitter", "type": "thread", "content": ["Tweet 1 (hook - sets up the problem, ends with ???)", "Tweet 2 (stat or data point)", "Tweet 3 (agitates the pain)", "Tweet 4 (the solution/insight)", "Tweet 5 (proof or social proof)", "Tweet 6 (CTA + follow for more)"], "hashtags": ["#Topic"], "optimize_for": "retweets|replies"},
+    {"platform": "instagram", "type": "caption", "content": "Story arc caption: hook (first line creates curiosity), body (builds narrative with 2-3 short paragraphs), CTA (save this, share with someone who needs this). 5-10 relevant hashtags at end.", "hashtags": ["#Topic", "#Industry", "#Tips", "#Marketing", "#Growth", "#Strategy", "#AI", "#Automation", "#8+ more"], "optimize_for": "saves|shares"},
+    {"platform": "facebook", "type": "post", "content": "Community-style post: conversational hook, body with story/data, question at end to drive comments.", "hashtags": ["#Topic"], "optimize_for": "comments|reactions"}
+  ]
+}"""
+
+SYSTEM_REVIEW = """You are a senior copy editor and performance marketing specialist.
+Score each copy variant on engagement potential using these criteria:
+- Hook strength (0-10): Does it stop the scroll?
+- Clarity (0-10): Is the value prop instantly clear?
+- Emotional resonance (0-10): Does it connect with the target persona?
+- CTA clarity (0-10): Is the action obvious?
+- Platform fit (0-10): Is it optimized for the platform's algorithm?
+Return ONLY valid JSON with scored variants:
+{
+  "variants": [
+    {"original_approach": "...", "engagement_score": N.N, "quality_notes": "...", "improvements": ["specific improvement 1", "specific improvement 2"], "best_for": "organic|paid|email|social"},
+    ...
   ]
 }"""
 
@@ -264,27 +299,45 @@ def _run_review(copy_variants: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Stage 6: Review — score and annotate copy variants."""
     reviewed = []
     for variant in copy_variants:
-        score_prompt = f"""Score this copy for engagement potential.
+        prompt = f"""Score this copy for engagement potential.
+
+Approach: {variant.get('approach', 'general')}
+Headline: {variant.get('headline', '')}
 Hook: {variant.get('hook', '')}
 Body: {variant.get('body', '')}
+CTA: {variant.get('cta', '')}
 Platform: {variant.get('platform', 'general')}
 
-Return ONLY valid JSON: {{"engagement_score": N.N, "quality_notes": "...", "improvements": ["..."]}}"""
+Return ONLY valid JSON."""
 
         try:
-            result = llm.generate_json(score_prompt)
-            reviewed.append({
-                **variant,
-                "engagement_score": result.get("engagement_score", 7.0),
-                "quality_notes": result.get("quality_notes", ""),
-                "improvements": result.get("improvements", []),
-            })
-        except Exception:
+            result = llm.generate_json(prompt, system=SYSTEM_REVIEW)
+            variants_data = result.get("variants", [])
+            if variants_data and len(variants_data) > 0:
+                scored = variants_data[0]
+                reviewed.append({
+                    **variant,
+                    "engagement_score": scored.get("engagement_score", 7.0),
+                    "quality_notes": scored.get("quality_notes", ""),
+                    "improvements": scored.get("improvements", []),
+                    "best_for": scored.get("best_for", "organic"),
+                })
+            else:
+                reviewed.append({
+                    **variant,
+                    "engagement_score": 7.0,
+                    "quality_notes": "",
+                    "improvements": [],
+                    "best_for": "organic",
+                })
+        except Exception as e:
+            logger.error("review_failed", error=str(e))
             reviewed.append({
                 **variant,
                 "engagement_score": 7.0,
                 "quality_notes": "",
                 "improvements": [],
+                "best_for": "organic",
             })
 
     return reviewed
@@ -420,6 +473,26 @@ def _save_to_db(
                 db.add(var)
                 variant_records.append(var)
 
+            db.flush()  # Ensure variants exist before assets
+
+            # Content assets (creative image prompts)
+            for asset in creative_assets:
+                # Find variant index
+                variant_idx = asset.get("variant_index", 0)
+                variant_id = variant_records[variant_idx].id if variant_idx < len(variant_records) else variant_records[0].id
+
+                content_asset = ContentAsset(
+                    execution_id=execution_id,
+                    variant_id=variant_id,
+                    asset_type="image_prompt",
+                    platform=platform,
+                    prompt=asset.get("main_prompt", ""),
+                    dimensions={"style": asset.get("style", "photorealistic"), "aspect_ratios": asset.get("aspect_ratio_options", ["1:1", "4:5"])},
+                    generation_method="llm_generated",
+                    status=ContentStatus.DRAFT,
+                )
+                db.add(content_asset)
+
             db.commit()
             artifacts["copy_variants"] = {"variants": copy_variants, "total": len(copy_variants)}
             artifacts["creative_assets"] = {"assets": creative_assets, "total": len(creative_assets)}
@@ -432,5 +505,4 @@ def _save_to_db(
             "creative_assets": {"assets": creative_assets, "total": len(creative_assets)},
             "repurposed_content": {"pieces": repurposed.get("pieces", []), "total": len(repurposed.get("pieces", []))},
         }
-    return artifacts
     return artifacts
