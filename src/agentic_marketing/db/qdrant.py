@@ -19,7 +19,7 @@ _client: QdrantClient | None = None
 def init_qdrant(host: str = "localhost", port: int = 6333, grpc_port: int = 6334) -> QdrantClient:
     """Initialize Qdrant client. Call once at startup."""
     global _client
-    _client = QdrantClient(host=host, port=port, prefer_grpc=True)
+    _client = QdrantClient(host=host, port=port, prefer_grpc=False, check_compatibility=False)
     logger.info("qdrant_init", host=host, port=port)
     return _client
 

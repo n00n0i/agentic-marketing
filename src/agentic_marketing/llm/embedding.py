@@ -19,20 +19,21 @@ _base_url: str = "https://api.cohere.ai/v1"
 
 def init_embedder(api_key: str | None = None, model: str = "embed-english-v3.0") -> None:
     global _api_key, _model, _dim
-    _api_key = api_key or os.environ.get("COHERE_API_KEY", "")
+    _api_key = api_key or os.environ.get("COHERE_API_KEY") or ""
     _model = model
     # Cohere embed-english-v3.0: 1024 dims
     _dim = 1024
-    logger.info("embedder_init", model=_model, dim=_dim)
+    logger.info("embedder_init", model=_model, dim=_dim, has_key=bool(_api_key))
 
 
 def embed(text: str) -> list[float]:
     """Return embedding vector for a single text."""
-    if not _api_key:
+    api_key = _api_key or os.environ.get("COHERE_API_KEY") or ""
+    if not api_key:
         raise RuntimeError("COHERE_API_KEY not set. Call init_embedder() first.")
 
     headers = {
-        "Authorization": f"Bearer {_api_key}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
     payload = {"model": _model, "input_type": "search_document", "texts": [text]}

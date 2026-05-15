@@ -356,17 +356,20 @@ Return ONLY valid JSON."""
 def _index_research(topic: str, research: dict[str, Any]) -> None:
     """Index research data in Qdrant for retrieval."""
     try:
-        embed = embedder.embed(topic)
+        embed_vec = embedder.embed(topic)
+        embed_sum = sum(embed_vec[:5])
+        logger.info("qdrant_embed_ok", topic=topic[:50], embed_dim=len(embed_vec), embed_sum=round(embed_sum, 4))
         qdrant.upsert_points(
             collection="research",
             points=[{
                 "id": str(uuid.uuid4()),
-                "vector": embed,
+                "vector": embed_vec,
                 "topic": topic,
                 "research": research,
                 "indexed_at": datetime.now(timezone.utc).isoformat(),
             }]
         )
+        logger.info("qdrant_upsert_ok", topic=topic[:50])
     except Exception as e:
         logger.warning("qdrant_index_failed", error=str(e))
 
