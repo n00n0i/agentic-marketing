@@ -15,7 +15,7 @@ logger = structlog.get_logger(__name__)
 _api_key: str | None = None
 _model: str = "gemma4:31b"
 _base_url: str = "https://ollama.com"  # Ollama Cloud
-_timeout_seconds: int = 120
+_timeout_seconds: int = 180
 
 
 def init_llm(
@@ -32,6 +32,20 @@ def init_llm(
         _base_url = os.environ["OLLAMA_BASE_URL"].rstrip("/")
     # Ollama Cloud uses Bearer token — no API key prefix needed
     logger.info("llm_init", model=_model, base_url=_base_url, has_key=bool(_api_key))
+
+
+def _retry_with_backoff(fn, max_attempts=3, base_delay=5):
+    """Retry a function with exponential backoff on timeout."""
+    import time
+    for attempt in range(max_attempts):
+        try:
+            return fn()
+        except (httpx.ReadTimeout, httpx.ConnectError) as e:
+            if attempt == max_attempts - 1:
+                raise
+            delay = base_delay * (2 ** attempt)
+            logger.warning(f"attempt_{attempt+1}_failed_retrying", error=str(e), delay=delay)
+            time.sleep(delay)
 
 
 def generate(prompt: str, system: str | None = None, stream: bool = False, **kwargs) -> str:
@@ -57,18 +71,14 @@ def generate(prompt: str, system: str | None = None, stream: bool = False, **kwa
         **{k: v for k, v in kwargs.items() if k in valid_params},
     }
 
-    with httpx.Client(timeout=_timeout_seconds, verify=False) as client:
-        response = client.post(
-            f"{_base_url}/api/chat",
-            headers=headers,
-            json=payload,
-        )
-        response.raise_for_status()
-
-        if stream:
-            # NDJSON streaming — collect content from each chunk
+    def _do_streaming():
+        with httpx.Client(timeout=_timeout_seconds, verify=False) as client:
+            response = client.post(
+                f"{_base_url}/api/chat", headers=headers, json=payload
+            )
+            response.raise_for_status()
             full_content = ""
-            for line in response.text.strip().split("\n"):
+            for line in response.iter_lines():
                 if not line.strip():
                     continue
                 try:
@@ -79,9 +89,19 @@ def generate(prompt: str, system: str | None = None, stream: bool = False, **kwa
                 except json.JSONDecodeError:
                     continue
             return full_content
-        else:
+
+    def _do_non_streaming():
+        with httpx.Client(timeout=_timeout_seconds, verify=False) as client:
+            response = client.post(
+                f"{_base_url}/api/chat", headers=headers, json=payload
+            )
+            response.raise_for_status()
             data = response.json()
             return data.get("message", {}).get("content", "")
+
+    if stream:
+        return _retry_with_backoff(_do_streaming)
+    return _retry_with_backoff(_do_non_streaming)
 
 
 def generate_json(prompt: str, system: str | None = None, **kwargs) -> dict[str, Any]:
