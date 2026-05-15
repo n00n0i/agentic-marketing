@@ -1,26 +1,25 @@
 import { NextResponse } from "next/server";
 
-// Mock data for analytics summary
-const MOCK_SUMMARY = {
-  total_posts: 847,
-  total_impressions: 284500,
-  avg_engagement: 4.2,
-  top_platform: "linkedin",
-  period: "last_30_days",
-  trend: {
-    posts_change: 12.5,
-    impressions_change: 8.3,
-    engagement_change: -2.1,
-  },
-};
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export async function GET() {
   try {
-    // In production: query PostgreSQL for real aggregated data
-    // For now, return mock data with a small delay to simulate API
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    return NextResponse.json(MOCK_SUMMARY);
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch analytics summary" }, { status: 500 });
+    const response = await fetch(`${API_BASE}/api/v1/analytics/summary?workspace_id=default`, {
+      headers: {
+        "X-API-Key": process.env.API_KEY || "dev-key",
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!response.ok) {
+      return NextResponse.json({ error: "Failed to fetch analytics" }, { status: response.status });
+    }
+
+    return NextResponse.json(await response.json());
+  } catch (error: any) {
+    if (error?.cause?.code === "ECONNREFUSED") {
+      return NextResponse.json({ error: "Backend unavailable" }, { status: 503 });
+    }
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
