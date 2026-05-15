@@ -276,22 +276,30 @@ Return ONLY valid JSON with style and main_prompt."""
 def _run_repurpose(copy_variants: list[dict[str, Any]], strategy: dict[str, Any]) -> dict[str, Any]:
     """Stage 5: Repurpose — adapt copy for multiple platforms."""
     primary = copy_variants[0] if copy_variants else {}
-    prompt = f"""Repurpose this content for multiple platforms.
+    # Build full context from strategy for multi-platform repurposing
+    prompt = f"""Repurpose the following content across multiple platforms using the provided strategy context.
 
-Original copy:
+STRATEGY CONTEXT:
+- Target Audience: {strategy.get('target_audience', 'professionals')}
+- Tone of Voice: {strategy.get('tone_of_voice', 'professional')}
+- Key Message: {strategy.get('key_message', '')}
+- Primary CTA: {strategy.get('primary_cta', '')}
+- Content Angles: {strategy.get('content_angles', [])}
+
+ORIGINAL COPY:
 Hook: {primary.get('hook', '')}
 Body: {primary.get('body', '')}
-Tone: {strategy.get('tone_of_voice', 'professional')}
+CTA: {primary.get('cta', '')}
 
-Platforms to create: LinkedIn (post), Twitter (thread), Instagram (caption).
-
-Return ONLY valid JSON."""
+Create repurposed content for ALL these platforms using the format requirements in the system prompt.
+Return ONLY valid JSON with a 'pieces' array."""
 
     try:
         result = llm.generate_json(prompt, system=SYSTEM_REPURPOSE)
+        logger.info("repurpose_raw_response", result=str(result)[:500])
         return result
     except Exception as e:
-        logger.error("repurpose_failed", error=str(e))
+        logger.error("repurpose_failed", error=str(e), prompt=prompt[:200])
         return {"pieces": []}
 
 
@@ -492,6 +500,37 @@ def _save_to_db(
                     status=ContentStatus.DRAFT,
                 )
                 db.add(content_asset)
+
+            # Repurposed content → published_posts (as draft, not yet published)
+            for piece in repurposed.get("pieces", []):
+                piece_platform = piece.get("platform", "").lower()
+                try:
+                    platform_enum = Platform[piece_platform.upper()]
+                except KeyError:
+                    platform_enum = Platform.LINKEDIN  # fallback
+
+                content_str = piece.get("content", "")
+                if isinstance(content_str, list):
+                    content_str = "\n".join(content_str)
+
+                published_post = PublishedPost(
+                    workspace_id=safe_workspace_id,
+                    execution_id=execution_id,
+                    variant_id=variant_records[0].id if variant_records else None,
+                    platform=platform_enum,
+                    content_text=content_str,
+                    media_urls=[],
+                    impressions=0,
+                    engagements=0,
+                    likes=0,
+                    comments=0,
+                    shares=0,
+                    clicks=0,
+                    reach=0,
+                    status="draft",
+                    error_message=None,
+                )
+                db.add(published_post)
 
             db.commit()
             artifacts["copy_variants"] = {"variants": copy_variants, "total": len(copy_variants)}

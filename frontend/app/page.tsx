@@ -58,10 +58,13 @@ export default function MarketingDashboard() {
     try {
       // In production, this would call the FastAPI backend
       // For now, we'll use a demo mode via fetch
-      const response = await fetch("/api/pipeline", {
+      const response = await fetch("/api/v1/pipeline/run", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, platform }),
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": "dev-key-123",
+        },
+        body: JSON.stringify({ topic, platform, workspace_id: "default" }),
       });
 
       if (!response.ok) {

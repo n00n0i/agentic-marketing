@@ -82,22 +82,27 @@ async def lifespan(app: FastAPI):
     try:
         host = qdrant_url.replace("http://", "").split(":")[0]
         port = int(qdrant_url.split(":")[-1])
-        init_qdrant(host=host, port=port)
+        qdrant_client = init_qdrant(host=host, port=port)
+        # Ensure research collection exists with correct dim
+        from agentic_marketing.db.qdrant import ensure_collection
+        from agentic_marketing.llm import embedding as _emb
+        ensure_collection("research", vector_dim=_emb.get_dim())
         logger.info("qdrant_init_ok")
     except Exception as e:
         logger.warning("qdrant_init_failed", error=str(e))
 
     # Initialize LLM (prefer Ollama Cloud, fallback to OpenAI)
     ollama_key = os.environ.get("OLLAMA_API_KEY", "")
-    openai_key = os.environ.get("OPENAI_API_KEY", "")
-    api_key = ollama_key or openai_key
+    cohere_key = os.environ.get("COHERE_API_KEY", "")
     model = os.environ.get("OLLAMA_MODEL", "gemma4:31b")
     base_url = os.environ.get("OLLAMA_BASE_URL", "https://ollama.com")
-    if api_key:
-        llm.init_llm(api_key=api_key, model=model, base_url=base_url)
-        embedder.init_embedder(api_key=openai_key if openai_key else None)
+    if ollama_key:
+        llm.init_llm(api_key=ollama_key, model=model, base_url=base_url)
         logger.info("llm_init_ok", model=model, base_url=base_url)
-    else:
+    if cohere_key:
+        embedder.init_embedder(api_key=cohere_key)
+        logger.info("embedder_init_ok", model=embedder._model, dim=embedder.get_dim())
+    if not ollama_key and not cohere_key:
         logger.warning("llm_init_skipped", reason="no_api_key")
     yield
     logger.info("server_shutdown")
