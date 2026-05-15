@@ -64,12 +64,14 @@ async def lifespan(app: FastAPI):
     logger = structlog.get_logger(__name__)
     logger.info("server_startup")
 
-    # Initialize DB
+    # Initialize DB + create tables
     database_url = os.environ.get("DATABASE_URL", "sqlite:///./agentic.db")
     try:
         if database_url.startswith("postgresql"):
-            init_engine(database_url)
-            logger.info("db_init_ok")
+            engine = init_engine(database_url)
+            from agentic_marketing.db.schema import init_db as create_tables
+            create_tables(engine)
+            logger.info("db_init_ok", url=database_url.split("@")[-1] if "@" in database_url else "sqlite")
         else:
             logger.warning("db_init_skipped", reason="no_postgres_url")
     except Exception as e:
@@ -89,16 +91,14 @@ async def lifespan(app: FastAPI):
     ollama_key = os.environ.get("OLLAMA_API_KEY", "")
     openai_key = os.environ.get("OPENAI_API_KEY", "")
     api_key = ollama_key or openai_key
-    model = os.environ.get("OLLAMA_MODEL", "gemma4:32b-cloud")
-    base_url = os.environ.get("OLLAMA_BASE_URL", "https://api.ollama.cloud/v1")
+    model = os.environ.get("OLLAMA_MODEL", "gemma4:31b")
+    base_url = os.environ.get("OLLAMA_BASE_URL", "https://ollama.com")
     if api_key:
         llm.init_llm(api_key=api_key, model=model, base_url=base_url)
-        embedder.init_embedder(api_key=api_key)
+        embedder.init_embedder(api_key=openai_key if openai_key else None)
         logger.info("llm_init_ok", model=model, base_url=base_url)
     else:
         logger.warning("llm_init_skipped", reason="no_api_key")
-
-    logger.info("server_ready")
     yield
     logger.info("server_shutdown")
 
@@ -137,7 +137,8 @@ def require_api_key(x_api_key: str | None = Header(None)) -> str:
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
 async def health() -> HealthResponse:
-    api_key = os.environ.get("OPENAI_API_KEY", "")
+    ollama_key = os.environ.get("OLLAMA_API_KEY", "")
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
     db_url = os.environ.get("DATABASE_URL", "")
     qdrant_url = os.environ.get("QDRANT_URL", "")
 
@@ -145,7 +146,7 @@ async def health() -> HealthResponse:
         status="healthy",
         version="1.0.0",
         timestamp=datetime.now(timezone.utc).isoformat(),
-        llm_configured=bool(api_key),
+        llm_configured=bool(ollama_key or openai_key),
         db_configured=bool(db_url),
         qdrant_configured=bool(qdrant_url),
     )

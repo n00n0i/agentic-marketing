@@ -71,9 +71,9 @@ export default function MarketingDashboard() {
       const data = await response.json();
       setResult(data);
     } catch (err) {
-      // Fallback to demo mode if API is not available
-      const demoResult = await runDemoPipeline(topic, platform);
-      setResult(demoResult);
+      // Never silently fall back to demo — show real error instead
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      setError(`Pipeline failed: ${errorMsg}. Check that backend is running on port 8000.`);
     } finally {
       setIsLoading(false);
     }
@@ -406,7 +406,6 @@ async function runDemoPipeline(topic: string, platform: string): Promise<Pipelin
       publish: "simulated",
       analytics: "pending",
     },
-    total_cost_estimate: 0.58,
-    message: "Demo mode: In production, this would generate real copy via Claude, real images via FLUX on Modal.",
+    total_cost_estimate: 0.00,
   };
 }
