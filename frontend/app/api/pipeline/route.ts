@@ -13,8 +13,8 @@ export async function POST(req: NextRequest) {
         "X-API-Key": process.env.API_KEY || "dev-key",
       },
       body: JSON.stringify({ topic, platform }),
-      // timeout: 2 minutes for pipeline to complete
-      signal: AbortSignal.timeout(120_000),
+      // timeout: 10 minutes for full pipeline (6 stages, each ~60-90s)
+      signal: AbortSignal.timeout(600_000),
     });
 
     if (!response.ok) {
