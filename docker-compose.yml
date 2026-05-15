@@ -1,5 +1,5 @@
 services:
-  # ── Backend: FastAPI + uvicorn ──────────────────────────────────────────
+  # ── Backend: FastAPI + uvicorn ──────────────────────────────────────────────
   backend:
     build:
       context: .
@@ -7,32 +7,25 @@ services:
     container_name: agentic-backend
     restart: unless-stopped
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql://agentic:agentic@db:5432/agentic}
-      - MONGODB_URL=${MONGODB_URL:-mongodb://mongo:27017/agentic}
-      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - DATABASE_URL=postgresql://agentic:${POSTGRES_PASSWORD}@db:5432/agentic
+      - QDRANT_URL=http://qdrant:6333
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
-      - TWITTER_API_KEY=${TWITTER_API_KEY}
-      - TWITTER_API_SECRET=${TWITTER_API_SECRET}
-      - TWITTER_ACCESS_TOKEN=${TWITTER_ACCESS_TOKEN}
-      - TWITTER_ACCESS_SECRET=${TWITTER_ACCESS_SECRET}
-      - LINKEDIN_CLIENT_ID=${LINKEDIN_CLIENT_ID}
-      - LINKEDIN_CLIENT_SECRET=${LINKEDIN_CLIENT_SECRET}
-      - DEMO_MODE=${DEMO_MODE:-true}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-prod}
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - qdrant
+      db:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 15s
+      retries: 5
+      start_period: 20s
 
-  # ── Frontend: Next.js production server ─────────────────────────────────
+  # ── Frontend: Next.js production ─────────────────────────────────────────────
   frontend:
     build:
       context: .
@@ -40,18 +33,19 @@ services:
     container_name: agentic-frontend
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost/api}
+      - NEXT_PUBLIC_API_URL=http://backend:8000
     ports:
       - "3000:3000"
     depends_on:
       - backend
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 15s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 30s
 
-  # ── PostgreSQL ───────────────────────────────────────────────────────────
+  # ── PostgreSQL 16 ───────────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
     container_name: agentic-db
@@ -59,33 +53,18 @@ services:
     environment:
       - POSTGRES_DB=agentic
       - POSTGRES_USER=agentic
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-agentic_pass}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
     volumes:
       - pg_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agentic"]
+      test: ["CMD-SHELL", "pg_isready -U agentic -d agentic"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # ── MongoDB ─────────────────────────────────────────────────────────────
-  mongo:
-    image: mongo:7
-    container_name: agentic-mongo
-    restart: unless-stopped
-    volumes:
-      - mongo_data:/data/db
-    ports:
-      - "27017:27017"
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── Qdrant (vector store) ────────────────────────────────────────────────
+  # ── Qdrant (vector store) ───────────────────────────────────────────────────
   qdrant:
     image: qdrant/qdrant:v1.7.4
     container_name: agentic-qdrant
@@ -103,5 +82,4 @@ services:
 
 volumes:
   pg_data:
-  mongo_data:
   qdrant_data:

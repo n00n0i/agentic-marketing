@@ -18,21 +18,14 @@ classifiers = [
 ]
 
 dependencies = [
-    # Core
-    "langchain>=0.3.0",
-    "langchain-core>=0.3.0",
-    "langgraph>=0.2.0",
-    "langchain-openai>=0.2.0",
-    "langchain-anthropic>=0.2.0",
+    # Core — no LangChain, we call OpenAI direct via httpx
     "pydantic>=2.9.0",
     "pydantic-settings>=2.6.0",
     "jsonschema>=4.23.0",
     "python-dotenv>=1.0.0",
     # Database
-    "psycopg2-binary>=2.9.0",
     "asyncpg>=0.30.0",
     "sqlalchemy>=2.0.0",
-    "pymongo>=4.9.0",
     # Vector store
     "qdrant-client>=1.12.0",
     # HTTP
@@ -42,8 +35,9 @@ dependencies = [
     "tenacity>=9.0.0",
     # Logging
     "structlog>=24.0.0",
-    # Social media
-    "tweepy>=4.14.0",
+    # FastAPI
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
 ]
 
 [project.optional-dependencies]
