@@ -15,7 +15,7 @@ logger = structlog.get_logger(__name__)
 _api_key: str | None = None
 _model: str = "gemma4:31b"
 _base_url: str = "https://ollama.com"  # Ollama Cloud
-_timeout_seconds: int = 180
+_timeout_seconds: int = 600
 
 
 def init_llm(
@@ -43,18 +43,19 @@ def _retry_with_backoff(fn, max_attempts=3, base_delay=5):
         except (httpx.ReadTimeout, httpx.ConnectError) as e:
             if attempt == max_attempts - 1:
                 raise
-            delay = base_delay * (2 ** attempt)
+            delay = min(base_delay * (2 ** attempt), 120)
             logger.warning(f"attempt_{attempt+1}_failed_retrying", error=str(e), delay=delay)
             time.sleep(delay)
 
 
 def generate(prompt: str, system: str | None = None, stream: bool = False, **kwargs) -> str:
     """Call Ollama Cloud chat API. Handles both streaming and non-streaming."""
-    if not _api_key:
+    api_key = _api_key or os.environ.get("OLLAMA_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
+    if not api_key:
         raise RuntimeError("OLLAMA_API_KEY not set. Call init_llm() first.")
 
     headers = {
-        "Authorization": f"Bearer {_api_key}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
