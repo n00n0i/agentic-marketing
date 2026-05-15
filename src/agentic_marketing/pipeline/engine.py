@@ -79,14 +79,10 @@ def run_pipeline(
     Run the full marketing pipeline.
     Returns execution result with all artifacts.
     """
-    # Initialize clients
-    llm.init_llm(api_key)
-    embedder.init_embedder(api_key)
-
+    # ── Stage 1: Research ──────────────────────────────────────────────────
     execution_id = str(uuid.uuid4())
     logger.info("pipeline_start", execution_id=execution_id, topic=topic, platform=platform)
 
-    # ── Stage 1: Research ──────────────────────────────────────────────────
     research = _run_research(topic)
     logger.info("stage_done", stage="research", execution_id=execution_id)
 

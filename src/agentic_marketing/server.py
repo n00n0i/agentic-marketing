@@ -85,12 +85,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("qdrant_init_failed", error=str(e))
 
-    # Initialize LLM
-    api_key = os.environ.get("OPENAI_API_KEY", "")
+    # Initialize LLM (prefer Ollama Cloud, fallback to OpenAI)
+    ollama_key = os.environ.get("OLLAMA_API_KEY", "")
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    api_key = ollama_key or openai_key
+    model = os.environ.get("OLLAMA_MODEL", "gemma4:32b-cloud")
+    base_url = os.environ.get("OLLAMA_BASE_URL", "https://api.ollama.cloud/v1")
     if api_key:
-        llm.init_llm(api_key)
-        embedder.init_embedder(api_key)
-        logger.info("llm_init_ok")
+        llm.init_llm(api_key=api_key, model=model, base_url=base_url)
+        embedder.init_embedder(api_key=api_key)
+        logger.info("llm_init_ok", model=model, base_url=base_url)
     else:
         logger.warning("llm_init_skipped", reason="no_api_key")
 

@@ -1,4 +1,4 @@
-"""OpenAI LLM client — production ready, no LangChain."""
+"""LLM client — OpenAI-compatible (Ollama Cloud / OpenAI / any compatible API)."""
 
 from __future__ import annotations
 
@@ -7,29 +7,37 @@ import json
 from typing import Any
 
 import httpx
-
 import structlog
 
 
 logger = structlog.get_logger(__name__)
 
 _api_key: str | None = None
-_model: str = "gpt-4o-mini"
-_base_url: str = "https://api.openai.com/v1"
-_timeout_seconds: int = 60
+_model: str = "gemma4:31b"
+_base_url: str = "https://ollama.com"  # Ollama Cloud
+_timeout_seconds: int = 120
 
 
-def init_llm(api_key: str | None = None, model: str = "gpt-4o-mini") -> None:
-    global _api_key, _model
-    _api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+def init_llm(
+    api_key: str | None = None,
+    model: str = "gemma4:32b-cloud",
+    base_url: str | None = None,
+) -> None:
+    global _api_key, _model, _base_url
+    _api_key = api_key or os.environ.get("OLLAMA_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
     _model = model
-    logger.info("llm_init", model=_model, has_key=bool(_api_key))
+    if base_url:
+        _base_url = base_url.rstrip("/")
+    elif os.environ.get("OLLAMA_BASE_URL"):
+        _base_url = os.environ["OLLAMA_BASE_URL"].rstrip("/")
+    # Ollama Cloud uses Bearer token — no API key prefix needed
+    logger.info("llm_init", model=_model, base_url=_base_url, has_key=bool(_api_key))
 
 
-def generate(prompt: str, system: str | None = None, **kwargs) -> str:
-    """Call OpenAI Chat Completions API directly."""
+def generate(prompt: str, system: str | None = None, stream: bool = False, **kwargs) -> str:
+    """Call Ollama Cloud chat API. Handles both streaming and non-streaming."""
     if not _api_key:
-        raise RuntimeError("OPENAI_API_KEY not set. Call init_llm() first.")
+        raise RuntimeError("OLLAMA_API_KEY not set. Call init_llm() first.")
 
     headers = {
         "Authorization": f"Bearer {_api_key}",
@@ -41,26 +49,43 @@ def generate(prompt: str, system: str | None = None, **kwargs) -> str:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
+    valid_params = ("temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty")
     payload = {
         "model": _model,
         "messages": messages,
-        **{k: v for k, v in kwargs.items() if k in ("temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty")},
+        "stream": stream,
+        **{k: v for k, v in kwargs.items() if k in valid_params},
     }
 
-    with httpx.Client(timeout=_timeout_seconds) as client:
+    with httpx.Client(timeout=_timeout_seconds, verify=False) as client:
         response = client.post(
-            f"{_base_url}/chat/completions",
+            f"{_base_url}/api/chat",
             headers=headers,
             json=payload,
         )
         response.raise_for_status()
-        data = response.json()
 
-    return data["choices"][0]["message"]["content"]
+        if stream:
+            # NDJSON streaming — collect content from each chunk
+            full_content = ""
+            for line in response.text.strip().split("\n"):
+                if not line.strip():
+                    continue
+                try:
+                    chunk = json.loads(line)
+                    content = chunk.get("message", {}).get("content", "")
+                    if content:
+                        full_content += content
+                except json.JSONDecodeError:
+                    continue
+            return full_content
+        else:
+            data = response.json()
+            return data.get("message", {}).get("content", "")
 
 
 def generate_json(prompt: str, system: str | None = None, **kwargs) -> dict[str, Any]:
-    """Call OpenAI and parse response as JSON."""
+    """Call LLM and parse response as JSON."""
     text = generate(prompt, system, **kwargs)
     try:
         return json.loads(text)
@@ -79,12 +104,9 @@ def count_tokens(text: str) -> int:
 
 
 def estimate_cost(tokens: int, model: str | None = None) -> float:
-    """Estimate cost in USD based on OpenAI pricing."""
+    """Estimate cost in USD (Ollama Cloud pricing varies)."""
+    # Ollama Cloud gemma4:32b — roughly $0.40/1M input, $1.60/1M output
     model = model or _model
-    # GPT-4o-mini: $0.15/1M input, $0.60/1M output
-    if "4o-mini" in model:
-        return tokens * 0.15 / 1_000_000
-    # GPT-4o: $2.50/1M input, $10/1M output
-    if "4o" in model and "mini" not in model:
-        return tokens * 2.50 / 1_000_000
-    return tokens * 0.15 / 1_000_000
+    if "gemma" in model:
+        return tokens * 0.40 / 1_000_000
+    return tokens * 0.15 / 1_000_000  # fallback

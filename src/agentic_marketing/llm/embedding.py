@@ -37,7 +37,7 @@ def embed(text: str) -> list[float]:
     }
     payload = {"model": _model, "input": text}
 
-    with httpx.Client(timeout=30) as client:
+    with httpx.Client(timeout=30, verify=False) as client:
         response = client.post(
             f"{_base_url}/embeddings",
             headers=headers,
