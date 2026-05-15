@@ -310,6 +310,65 @@ def _index_research(topic: str, research: dict[str, Any]) -> None:
         logger.warning("qdrant_index_failed", error=str(e))
 
 
+def _ensure_workspace(db: Session, workspace_id: str) -> str:
+    """Ensure a workspace exists. Create default if missing."""
+    # Check if workspace exists
+    from agentic_marketing.db.schema import Workspace, WorkspaceMember, User
+    try:
+        existing = db.query(Workspace).filter_by(id=workspace_id).first()
+        if existing:
+            return workspace_id
+    except Exception:
+        pass
+
+    # Try to find default workspace (id = 'default')
+    try:
+        default_ws = db.query(Workspace).filter_by(id="default").first()
+        if default_ws:
+            return str(default_ws.id)
+    except Exception:
+        pass
+
+    # Create default workspace
+    try:
+        default_ws = Workspace(
+            id="default",
+            name="Default Workspace",
+            plan="free",
+            is_active=True,
+            monthly_campaigns=3,
+            monthly_posts=50,
+            api_calls_used=0,
+            api_calls_limit=1000,
+            settings={},
+        )
+        db.add(default_ws)
+        db.commit()
+        return "default"
+    except Exception:
+        db.rollback()
+        # If default ID collides, try uuid
+        import uuid
+        new_id = str(uuid.uuid4())
+        try:
+            new_ws = Workspace(
+                id=new_id,
+                name="Default Workspace",
+                plan="free",
+                is_active=True,
+                monthly_campaigns=3,
+                monthly_posts=50,
+                api_calls_used=0,
+                api_calls_limit=1000,
+                settings={},
+            )
+            db.add(new_ws)
+            db.commit()
+            return new_id
+        except Exception:
+            return workspace_id  # fallback to whatever was passed
+
+
 def _save_to_db(
     execution_id: str,
     workspace_id: str,
@@ -325,10 +384,13 @@ def _save_to_db(
     artifacts = {}
     try:
         with session_scope() as db:
+            # Ensure workspace exists
+            safe_workspace_id = _ensure_workspace(db, workspace_id)
+
             # Pipeline execution
             exec_record = PipelineExecution(
                 id=execution_id,
-                workspace_id=workspace_id,
+                workspace_id=safe_workspace_id,
                 campaign_id=campaign_id,
                 topic=topic,
                 platform=platform,
@@ -336,9 +398,10 @@ def _save_to_db(
                 stage_status={"all": "completed"},
                 status="completed",
                 completed_at=datetime.now(timezone.utc),
-                total_cost_usd=0.58,
+                total_cost_usd=0.00,
             )
             db.add(exec_record)
+            db.flush()  # Ensure execution exists before variants
 
             # Content variants
             variant_records = []
@@ -369,5 +432,5 @@ def _save_to_db(
             "creative_assets": {"assets": creative_assets, "total": len(creative_assets)},
             "repurposed_content": {"pieces": repurposed.get("pieces", []), "total": len(repurposed.get("pieces", []))},
         }
-
+    return artifacts
     return artifacts
